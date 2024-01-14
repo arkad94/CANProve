@@ -23,6 +23,9 @@ def send_and_receive():
 
     except can.CanError as e:
         print("Error: ", e)
+    finally:
+        if bus:
+            bus.shutdown()        
 
 # Initialize variables for send and receive times
 send_time = None
@@ -33,11 +36,15 @@ try:
 except TypeError:
     print("Did not receive any CAN messages in time.")
 
+
+
 # Calculate and print the latency only if both send and receive times are available
 if send_time and recv_time:
     latency = recv_time - send_time
     print(f"Round-trip latency: {latency} seconds")
 else:
     print("Unable to calculate latency without both send and receive times.")
+
+ 
 
 
