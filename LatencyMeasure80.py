@@ -22,7 +22,7 @@ def send_and_receive(bus):
 latencies = []
 bus = can.interface.Bus(channel='can0', bustype='socketcan')
 
-for _ in range(80):
+for _ in range(2):
     latency_ms = send_and_receive(bus)
     if latency_ms is not None:
         latencies.append(latency_ms)
