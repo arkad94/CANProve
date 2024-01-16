@@ -1,7 +1,16 @@
 import can
 import time
+import struct
+import datetime
 
-def send_can_message(bus, arbitration_id, data):
+def milliseconds_since_midnight():
+    now = datetime.datetime.now()
+    midnight = datetime.datetime(now.year, now.month, now.day)
+    return int((now - midnight).total_seconds() * 1000)  # Convert to milliseconds
+
+def send_can_message(bus, arbitration_id):
+    current_time = milliseconds_since_midnight()
+    data = struct.pack('I', current_time)  # Pack the time into 4 bytes
     message = can.Message(arbitration_id=arbitration_id, data=data, is_extended_id=False)
     try:
         bus.send(message)
@@ -35,7 +44,7 @@ def main():
 
     for _ in range(v):
         sent_time = time.time()
-        send_can_message(bus, 749, [0x00, 0x01, 0x02])  # Example data
+        send_can_message(bus, 749)  # Modified call without the additional data array
         response = receive_response(bus, 749)
 
         if response is None:
