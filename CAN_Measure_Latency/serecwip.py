@@ -1,14 +1,15 @@
 import can
 import time
 import struct
-import datetime
-import pandas as pd
+eimport pandas as pd
 import os
+from datetime import datetime
 
 def milliseconds_since_midnight():
-    now = datetime.datetime.now()
-    midnight = datetime.datetime(now.year, now.month, now.day)
+    now = datetime.now()
+    midnight = datetime(now.year, now.month, now.day)
     return int((now - midnight).total_seconds() * 1000)  # Convert to milliseconds
+  # Convert to milliseconds
 
 def send_can_message(bus, arbitration_id):
     current_time = milliseconds_since_midnight()
@@ -81,6 +82,15 @@ def main():
     # Create output folder if it doesn't exist
     output_folder = "output"
     os.makedirs(output_folder, exist_ok=True)
+
+    # Include current timestamp in the filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    excel_filename = os.path.join(output_folder, f"CAN_test_results_{timestamp}.xlsx")
+
+    with pd.ExcelWriter(excel_filename, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='LatencyData')
+
+    print(f"Results saved to {excel_filename}")
 
     # Save the DataFrame to an Excel file
     excel_filename = os.path.join(output_folder, "CAN_test_results.xlsx")
