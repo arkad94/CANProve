@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# Activate the virtual environment
+echo "Activating the virtual environment..."
+source /home/arkad94/CANProve/env/bin/activate
+echo "Virtual environment activated."
+
 # Prompt for the baud rate
 echo "Please enter the desired CAN baud rate:"
 read baudrate
@@ -8,13 +13,16 @@ read baudrate
 CAN_INTERFACE="can0"
 
 # Take the CAN network down
+echo "Taking the CAN network down..."
 sudo ip link set down $CAN_INTERFACE
 
 # Set the new baud rate
+echo "Setting CAN network to $baudrate bps..."
 sudo ip link set $CAN_INTERFACE type can bitrate $baudrate
 
 # Bring the CAN network back up
+echo "Bringing the CAN network back up..."
 sudo ip link set up $CAN_INTERFACE
 
 # Display the new settings
-echo "The CAN network $CAN_INTERFACE is now set to $baudrate bps"
+echo "The CAN network $CAN_INTERFACE is now set to $baudrate bps."

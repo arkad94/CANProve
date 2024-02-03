@@ -1,0 +1,106 @@
+import can
+import time
+import struct
+import datetime
+import pandas as pd
+import os
+
+def milliseconds_since_midnight():
+    now = datetime.datetime.now()
+    midnight = datetime.datetime(now.year, now.month, now.day)
+    return int((now - midnight).total_seconds() * 1000)  # Convert to milliseconds
+
+def send_can_message(bus, arbitration_id):
+    current_time = milliseconds_since_midnight()
+    data = struct.pack('I', current_time)  # Pack the time into 4 bytes
+    message = can.Message(arbitration_id=arbitration_id, data=data, is_extended_id=False)
+    try:
+        bus.send(message)
+        return current_time
+    except can.CanError:
+        print("Message NOT sent")
+        return None
+
+def receive_response(bus, arbitration_id):
+    while True:
+        message = bus.recv(10.0)  # Timeout in seconds
+        if message is None:
+            print("Timeout occurred, no message.")
+            return None, None, None
+        if message.arbitration_id == arbitration_id:
+            recv_time = milliseconds_since_midnight()
+            # Unpack the received data to get one-way latency (a1) and N2's send time
+            one_way_latency, _ = struct.unpack('II', message.data)
+            return message, recv_time, one_way_latency
+
+def calculate_latency(sent_time, recv_time):
+    if recv_time is None:
+        return None
+    latency = recv_time - sent_time
+    return latency / 1000.0  # Convert to seconds
+
+def main():
+    global bus
+    bus = can.interface.Bus(channel='can0', bustype='socketcan', bitrate=500000)
+    v = int(input("Enter the number of iterations (v): "))
+    mode = input("Enter Mode (Y/N): ").strip().lower()  # Accept 'y' or 'n'
+    total_latency = 0
+    valid_responses = 0
+
+    records = []
+
+
+    for _ in range(v):
+        sent_time = send_can_message(bus, 749)
+        if sent_time is None:
+            continue
+
+        response, recv_time, one_way_latency = receive_response(bus, 749)
+        if recv_time is not None:
+            a2 = (recv_time - sent_time) / 1000.0  # Calculate a2 in seconds
+            full_latency = a2 + one_way_latency / 1000.0  # Sum a1 and a2 for full latency
+            total_latency += full_latency  # Add to total latency
+            valid_responses += 1  # Increment valid responses count
+            records.append([sent_time, recv_time, full_latency])
+        else:
+            records.append([sent_time, "No response", "N/A"])
+
+        if response is None and mode == 'n':
+            break
+
+
+
+    # This part should be indented to be inside the main() function
+    df = pd.DataFrame(records, columns=['Sent Time', 'Received Time', 'Latency (s)'])
+
+    if valid_responses > 0:
+        average_latency = total_latency / valid_responses
+        print(f"Average latency: {average_latency} seconds")
+        
+        # Append average latency using pandas.concat
+        avg_df = pd.DataFrame([{'Latency (s)': 'Average Latency', 'Sent Time': '', 'Received Time': average_latency}])
+        df = pd.concat([df, avg_df], ignore_index=True)
+    else:
+        print("No valid responses received.")
+
+    # Create output folder if it doesn't exist
+    output_folder = "output"
+    os.makedirs(output_folder, exist_ok=True)
+
+    # Save the DataFrame to an Excel file
+    excel_filename = os.path.join(output_folder, "CAN_test_results.xlsx")
+    with pd.ExcelWriter(excel_filename, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='LatencyData')
+
+    print(f"Results saved to {excel_filename}")
+
+if __name__ == "__main__":
+    bus = None
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\nInterrupted by user.")
+    finally:
+        print("Closing CAN bus.")
+        if bus:
+            bus.shutdown()
