@@ -1,14 +1,31 @@
 import can
 import time
-import sys
 import threading
 import select
+import sys
 
-def send_messages(bus, message, stop_event):
+def send_messages(bus, message, stop_event, continue_event):
     while not stop_event.is_set():
-        bus.send(message)
-        print("Brake actuated!")
-        time.sleep(0.003)  # Sleep for 3 milliseconds
+        if continue_event.is_set():
+            bus.send(message)
+            print("Brake actuated!")
+            time.sleep(0.003)  # Sleep for 3 milliseconds
+        else:
+            time.sleep(0.1)  # Sleep when paused
+
+def user_input_handler(continue_event, stop_event):
+    print("Type '.' to pause/resume sending messages. Type 'quit' to exit.")
+    while not stop_event.is_set():
+        user_input = input()
+        if user_input == '.':
+            if continue_event.is_set():
+                continue_event.clear()  # Stop sending messages
+                print("Sending paused.")
+            else:
+                continue_event.set()  # Resume sending messages
+                print("Sending resumed.")
+        elif user_input == 'quit':
+            stop_event.set()
 
 def main():
     # Ask the user to select the baud rate
@@ -27,25 +44,20 @@ def main():
     message = can.Message(arbitration_id=0x001, data=[0x01, 0x01, 0x01, 0x01, 0x01])
 
     stop_event = threading.Event()
-    thread = threading.Thread(target=send_messages, args=(bus, message, stop_event))
-    thread.start()
+    continue_event = threading.Event()
+    continue_event.set()  # Initially allow message sending
 
-    print("Type '.' to stop sending messages.")
-    try:
-        while True:
-            # Non-blocking input using select
-            if select.select([sys.stdin], [], [], 0)[0]:
-                user_input = sys.stdin.readline().strip()
-                if user_input == '.':
-                    stop_event.set()
-                    break
-    except KeyboardInterrupt:
-        print("Script terminated by keyboard interrupt.")
-        stop_event.set()
-    finally:
-        thread.join()
-        bus.shutdown()
-        sys.exit(0)
+    can_thread = threading.Thread(target=send_messages, args=(bus, message, stop_event, continue_event))
+    input_thread = threading.Thread(target=user_input_handler, args=(continue_event, stop_event))
+
+    can_thread.start()
+    input_thread.start()
+
+    # Wait for threads to finish
+    can_thread.join()
+    input_thread.join()
+    bus.shutdown()
+    sys.exit(0)
 
 if __name__ == "__main__":
     main()
