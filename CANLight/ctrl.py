@@ -10,10 +10,20 @@ def send_can_message(bus, message_id, data):
     except can.CanError:
         print("Message NOT sent")
 
+def countdown(seconds):
+    for i in range(seconds, 0, -1):
+        print(i)
+        time.sleep(1)         
+
 def main():
     # User input for baud rate
     baud_rate_input = input("Select baud rate: 1 for 500 kHz, 2 for 1 MHz: ")
     baud_rate = 500000 if baud_rate_input == '1' else 1000000
+
+    # Countdown
+    print("Starting countdown...")
+    countdown(10)
+    print("Countdown complete. Starting CAN communication.")    
 
     # Configure CAN interface
     bus = can.interface.Bus(channel='can0', bustype='socketcan', bitrate=baud_rate)
